@@ -131,6 +131,8 @@ def direct_link_generator(link):
         return osdn(link)
     elif 'github.com' in domain:
         return github(link)
+    elif "buzzheavier.com" in domain:
+        return buzzheavier(link)
     elif 'hxfile.co' in domain:
         return hxfile(link)
     elif '1drv.ms' in domain:
@@ -342,6 +344,40 @@ def github(url):
             return _res.headers["location"]
         raise DirectDownloadLinkException("ERROR: Can't extract the link")
 
+def buzzheavier(url):
+    """
+    Generate a direct download link for buzzheavier URLs.
+    @param link: URL from buzzheavier
+    @return: Direct download link
+    """
+    session = Session()
+    if "/download" not in url:
+        url += "/download"
+
+    # Normalize URL
+    url = url.strip()
+    session.headers.update(
+        {
+            "referer": url.split("/download")[0],
+            "hx-current-url": url.split("/download")[0],
+            "hx-request": "true",
+            "priority": "u=1, i",
+        }
+    )
+
+    try:
+        response = session.get(url)
+        d_url = response.headers.get("Hx-Redirect")
+
+        if not d_url:
+            raise DirectDownloadLinkException("ERROR: Failed to fetch direct link.")
+
+        parsed_url = urlparse(url)
+        return f"{parsed_url.scheme}://{parsed_url.netloc}{d_url}"
+    except Exception as e:
+        raise DirectDownloadLinkException(f"ERROR: {e.__class__.__name__}") from e
+    finally:
+        session.close()
 
 def hxfile(url):
     try:
