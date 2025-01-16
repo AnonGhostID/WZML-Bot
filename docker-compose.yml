@@ -1,37 +1,36 @@
-version: "3.3"
+version: "3.8"
 services:
-  #gluetun:
-    #image: qmcgaw/gluetun:v3.34
-    #container_name: gluetun
-    # External Container --> https://github.com/qdm12/gluetun-wiki/blob/main/setup/connect-a-container-to-gluetun.md#external-container-to-gluetun
-    #cap_add:
-    #  - NET_ADMIN
-    #devices:
-    #  - /dev/net/tun:/dev/net/tun
-    #environment:
-    #  # SetUp --> https://github.com/qdm12/gluetun-wiki/tree/main/setup#setup
-    #  - VPN_SERVICE_PROVIDER=
-    #  - VPN_TYPE=
-    #  # OpenVPN --> https://github.com/qdm12/gluetun-wiki/blob/main/setup/options/openvpn.md
-    #  - OPENVPN_USER=  
-    #  - OPENVPN_PASSWORD=
-    #  # Wireguard --> https://github.com/qdm12/gluetun-wiki/blob/main/setup/options/wireguard.md
-    #  - WIREGUARD_PRIVATE_KEY=
-    #  - WIREGUARD_ADDRESS=
-    #  - WIREGUARD_PUBLIC_KEY=
-    #  # TimeZone Logs --> https://github.com/qdm12/gluetun-wiki/blob/main/setup/options/others.md
-    #  - TZ=Asia/Kolkata
-    #  # Server List Updater --> https://github.com/qdm12/gluetun-wiki/blob/main/setup/servers.md#update-the-vpn-servers-list
+  gluetun:
+    image: qmcgaw/gluetun
+    container_name: gluetun
+    cap_add:
+     - NET_ADMIN
+    devices:
+     - /dev/net/tun:/dev/net/tun
+    # environment:  # Pakai ini kalo punya wireguard sendiri
+    #  - VPN_SERVICE_PROVIDER=custom
+    #  - VPN_TYPE=wireguard
+    #  - WIREGUARD_PRIVATE_KEY=PRIVATE_KEY
+    #  - WIREGUARD_ADDRESSES=172.16.0.2/32
+    #  - WIREGUARD_PUBLIC_KEY=PUBLIC_KEY
+    #  - WIREGUARD_ENDPOINT_IP=162.159.192.1
+    #  - WIREGUARD_ENDPOINT_PORT=2408
+    #  - TZ=Asia/Jakarta
     #  - UPDATER_PERIOD=24h
-    #ports:
-    #  - "80:80"
-    #  - "8080:8080"
-    #restart: on-failure
+    environment:
+     - VPN_SERVICE_PROVIDER=nordvpn
+     - VPN_TYPE=wireguard
+     - WIREGUARD_PRIVATE_KEY=PRIVATE_KEY
+     - SERVER_HOSTNAMES=sg545.nordvpn.com
+     - TZ=Asia/Jakarta
+     - UPDATER_PERIOD=24h
+    ports:
+     - "80:80"
+     - "8080:8080"
+    restart: on-failure
   app:
     build: .
-    #network_mode: "service:gluetun" #If using VPN, Remove the Hash from first and fill up Above Details.
+    network_mode: "service:gluetun" # komen aja kalo ma matiin vpn nya
     command: bash start.sh
     restart: on-failure
-    ports:
-      - "80:80"
-      - "8080:8080"
+    # Removed ports section
