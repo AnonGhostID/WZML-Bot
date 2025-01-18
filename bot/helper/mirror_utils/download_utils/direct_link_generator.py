@@ -72,7 +72,7 @@ debrid_link_sites = ["1dl.net", "1fichier.com", "alterupload.com", "cjoint.net",
                 "hitfile.net", "hitf.cc", "hulkshare.com", "icerbox.com", "isra.cloud", "goloady.com", "jumploads.com", "katfile.com", 
                 "k2s.cc", "keep2share.com", "keep2share.cc", "kshared.com", "load.to", "mediafile.cc", "mediafire.com", "mega.nz", 
                 "mega.co.nz", "mexa.sh", "mexashare.com", "mx-sh.net", "mixdrop.co", "mixdrop.to", "mixdrop.club", "mixdrop.sx", 
-                "modsbase.com", "nelion.me", "nitroflare.com", "nitro.download", "e.pcloud.link", "pixeldrain.com", "prefiles.com", "rg.to", 
+                "modsbase.com", "nelion.me", "nitroflare.com", "nitro.download", "e.pcloud.link", "prefiles.com", "rg.to", 
                 "rapidgator.net", "rapidgator.asia", "scribd.com", "sendspace.com", "sharemods.com", "soundcloud.com", "noregx.debrid.link", 
                 "streamlare.com", "slmaxed.com", "sltube.org", "slwatch.co", "streamtape.com", "subyshare.com", "supervideo.tv", "terabox.com", 
                 "tezfiles.com", "turbobit.net", "turbobit.cc", "turbobit.pw", "turbobit.online", "turbobit.ru", "turbobit.live", "turbo.to", 
@@ -131,7 +131,7 @@ def direct_link_generator(link):
         return osdn(link)
     elif 'github.com' in domain:
         return github(link)
-    elif "buzzheavier.com" in domain:
+    elif any(x in domain for x in ['buzzheavier.com', 'fuckingfast.co']):
         return buzzheavier(link)
     elif 'hxfile.co' in domain:
         return hxfile(link)
@@ -316,27 +316,58 @@ def get_captcha_token(session, params):
 
 
 def mediafire(url, session=None):
-    if '/folder/' in url:
+    if "/folder/" in url:
         return mediafireFolder(url)
-    if final_link := findall(r'https?:\/\/download\d+\.mediafire\.com\/\S+\/\S+\/\S+', url):
+    if "::" in url:
+        _password = url.split("::")[-1]
+        url = url.split("::")[-2]
+    else:
+        _password = ""
+    if final_link := findall(
+        r"https?:\/\/download\d+\.mediafire\.com\/\S+\/\S+\/\S+", url
+    ):
         return final_link[0]
+
+    def _repair_download(url, session):
+        try:
+            html = HTML(session.get(url).text)
+            if new_link := html.xpath('//a[@id="continue-btn"]/@href'):
+                return mediafire(f"https://mediafire.com/{new_link[0]}")
+        except Exception as e:
+            raise DirectDownloadLinkException(f"ERROR: {e.__class__.__name__}") from e
+
     if session is None:
-        session = Session()
+        session = create_scraper()
         parsed_url = urlparse(url)
-        url = f'{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path}'
+        url = f"{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path}"
     try:
         html = HTML(session.get(url).text)
     except Exception as e:
         session.close()
         raise DirectDownloadLinkException(f"ERROR: {e.__class__.__name__}") from e
-    if error:= html.xpath('//p[@class="notranslate"]/text()'):
+    if error := html.xpath('//p[@class="notranslate"]/text()'):
         session.close()
         raise DirectDownloadLinkException(f"ERROR: {error[0]}")
-    if not (final_link := html.xpath("//a[@id='downloadButton']/@href")):
-        session.close()
-        raise DirectDownloadLinkException("ERROR: No links found in this page Try Again")
-    if final_link[0].startswith('//'):
-        return mediafire(f'https://{final_link[0][2:]}', session)
+    if html.xpath("//div[@class='passwordPrompt']"):
+        if not _password:
+            session.close()
+            raise DirectDownloadLinkException(
+                f"ERROR: {PASSWORD_ERROR_MESSAGE}".format(url)
+            )
+        try:
+            html = HTML(session.post(url, data={"downloadp": _password}).text)
+        except Exception as e:
+            session.close()
+            raise DirectDownloadLinkException(f"ERROR: {e.__class__.__name__}") from e
+        if html.xpath("//div[@class='passwordPrompt']"):
+            session.close()
+            raise DirectDownloadLinkException("ERROR: Wrong password.")
+    if not (final_link := html.xpath('//a[@class="input popsok" and @id="downloadButton"]/@href')):
+        if repair_link := html.xpath("//a[@class='retry']/@href"):
+            return _repair_download(repair_link[0], session)
+        raise DirectDownloadLinkException(
+            "ERROR: No links found in this page Try Again"
+        )
     session.close()
     return final_link[0]
 
@@ -482,22 +513,9 @@ def onedrive(link):
 def pixeldrain(url):
     url = url.strip("/ ")
     file_id = url.split("/")[-1]
-    if url.split("/")[-2] == "l":
-        info_link = f"https://pixeldrain.com/api/list/{file_id}"
-        dl_link = f"https://pixeldrain.com/api/list/{file_id}/zip?download"
-    else:
-        info_link = f"https://pixeldrain.com/api/file/{file_id}/info"
-        dl_link = f"https://pixeldrain.com/api/file/{file_id}?download"
-    with create_scraper() as session:
-        try:
-            resp = session.get(info_link).json()
-        except Exception as e:
-            raise DirectDownloadLinkException(f"ERROR: {e.__class__.__name__}") from e
-    if resp["success"]:
-        return dl_link
-    else:
-        raise DirectDownloadLinkException(
-            f"ERROR: Cant't download due {resp['message']}.")
+    bypass_link = f"https://pd.cybar.xyz/{file_id}"
+    return bypass_link
+
 
 
 def antfiles(url):
