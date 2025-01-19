@@ -512,10 +512,11 @@ def onedrive(link):
 
 def pixeldrain(url):
     url = url.strip("/ ")
+    if "/l/" in url:
+        raise DirectDownloadLinkException("ERROR: Link Gallery! Generate here: https://pixeldrain-bypass.cybar.xyz/")
     file_id = url.split("/")[-1]
     bypass_link = f"https://pd.cybar.xyz/{file_id}"
     return bypass_link
-
 
 
 def antfiles(url):
