@@ -213,6 +213,8 @@ def direct_link_generator(link):
         raise DirectDownloadLinkException('ERROR: R.I.P Zippyshare')
     else:
         raise DirectDownloadLinkException(f'No Direct link function found for {link}')
+    elif 'qiwi.gg' in domain:
+        return qiwi(link)
 
 
 def real_debrid(url: str, tor=False):
@@ -1438,3 +1440,20 @@ def streamvid(url: str):
         elif error:= html.xpath('//div[@class="not-found-text"]/text()'):
             raise DirectDownloadLinkException(f'ERROR: {error[0]}')
         raise DirectDownloadLinkException('ERROR: Something went wrong')
+
+def qiwi(url):
+    """qiwi.gg link generator
+    based on https://github.com/aenulrofik"""
+    with Session() as session:
+        file_id = url.split("/")[-1]
+        try:
+            res = session.get(url).text
+        except Exception as e:
+            raise DirectDownloadLinkException(
+                f"ERROR: {e.__class__.__name__}",
+            ) from e
+        tree = HTML(res)
+        if name := tree.xpath('//h1[@class="page_TextHeading__VsM7r"]/text()'):
+            ext = name[0].split(".")[-1]
+            return f"https://spyderrock.com/{file_id}.{ext}"
+        raise DirectDownloadLinkException("ERROR: File not found")
