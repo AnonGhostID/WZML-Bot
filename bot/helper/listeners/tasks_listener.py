@@ -501,9 +501,21 @@ class MirrorLeechListener:
             if link or rclonePath and config_dict['RCLONE_SERVE_URL'] and not private:
                 if (is_DDL := isinstance(link, dict)):
                     for dlup, dlink in link.items():
-                        buttons.ubutton(BotTheme('DDL_LINK', Serv=dlup), dlink)
+                        if dlink:  # Add this check
+                            # Clean and validate URL
+                            clean_url = dlink.strip().strip('"')
+                            if clean_url.startswith('http'):
+                                # Add service emoji/icon
+                                service_icons = {
+                                    'GoFile': '📁',
+                                    'PixelDrain': '📤',
+                                    'StreamTape': '🎥'
+                                }
+                                service_icon = service_icons.get(dlup, '🔗')
+                                button_text = f"{service_icon} {dlup}"
+                                buttons.ubutton(f"{button_text} Link", clean_url)
                 elif link and (user_id == OWNER_ID or not config_dict['DISABLE_DRIVE_LINK']):
-                        buttons.ubutton(BotTheme('CLOUD_LINK'), link)
+                    buttons.ubutton(BotTheme('CLOUD_LINK'), link)
                 else:
                     msg += BotTheme('RCPATH', RCpath=rclonePath)
                 if rclonePath and (RCLONE_SERVE_URL := config_dict['RCLONE_SERVE_URL']):

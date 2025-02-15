@@ -13,6 +13,7 @@ from aiohttp.client_exceptions import ContentTypeError
 from bot import LOGGER, user_data
 from bot.helper.mirror_utils.upload_utils.ddlserver.gofile import Gofile
 from bot.helper.mirror_utils.upload_utils.ddlserver.streamtape import Streamtape
+from bot.helper.mirror_utils.upload_utils.ddlserver.pixeldrain import PixelDrain
 from bot.helper.ext_utils.fs_utils import get_mime_type
 
 
@@ -57,40 +58,73 @@ class DDLUploader:
     
     @retry(wait=wait_exponential(multiplier=2, min=4, max=8), stop=stop_after_attempt(3),
         retry=retry_if_exception_type(Exception))
-    async def upload_aiohttp(self, url, file_path, req_file, data):
+    async def upload_aiohttp(self, url, file_path, req_file, data, headers=None, method='POST'):
+        """Modified to support both POST and PUT methods with proper file handling"""
         with ProgressFileReader(filename=file_path, read_callback=self.__progress_callback) as file:
-            data[req_file] = file
-            async with ClientSession() as self.__asyncSession:
-                async with self.__asyncSession.post(url, data=data) as resp:
-                    if resp.status == 200:
-                        try:
-                            return await resp.json()
-                        except ContentTypeError:
-                            return "Uploaded"
-                        except JSONDecodeError:
+            if method.upper() == 'PUT':
+                # For PUT requests (like PixelDrain)
+                async with ClientSession() as session:
+                    async with session.put(url, data=file, headers=headers) as resp:
+                        LOGGER.info(f"Upload response status: {resp.status}")
+                        if resp.status in [200, 201]:
+                            try:
+                                return await resp.json()
+                            except ContentTypeError:
+                                return await resp.text()
+                        else:
+                            LOGGER.error(f"Upload failed with status {resp.status}: {await resp.text()}")
+                            return None
+            else:
+                # For POST requests (like GoFile)
+                data[req_file] = file
+                async with ClientSession() as session:
+                    async with session.post(url, data=data, headers=headers) as resp:
+                        LOGGER.info(f"Upload response status: {resp.status}")
+                        if resp.status == 200:
+                            try:
+                                return await resp.json()
+                            except ContentTypeError:
+                                return await resp.text()
+                        else:
+                            LOGGER.error(f"Upload failed with status {resp.status}: {await resp.text()}")
                             return None
 
     async def __upload_to_ddl(self, file_path):
+        """Modified to better handle upload responses"""
         all_links = {}
         for serv, (enabled, api_key) in self.__ddl_servers.items():
             if enabled:
                 self.total_files = 0
                 self.total_folders = 0
-                if serv == 'gofile':
-                    self.__engine = 'GoFile API'
-                    nlink = await Gofile(self, api_key).upload(file_path)
-                    all_links['GoFile'] = nlink
-                if serv == 'streamtape':
-                    self.__engine = 'StreamTape API'
-                    try:
+                try:
+                    if serv == 'gofile':
+                        self.__engine = 'GoFile API'
+                        nlink = await Gofile(self, api_key).upload(file_path)
+                        if nlink:
+                            all_links['GoFile'] = nlink
+                    elif serv == 'streamtape':
+                        self.__engine = 'StreamTape API'
                         login, key = api_key.split(':')
-                    except IndexError:
-                        raise Exception("StreamTape Login & Key not Found, Kindly Recheck !")
-                    nlink = await Streamtape(self, login, key).upload(file_path)
-                    all_links['StreamTape'] = nlink
-                self.__processed_bytes = 0
+                        nlink = await Streamtape(self, login, key).upload(file_path)
+                        if nlink:
+                            all_links['StreamTape'] = nlink
+                    elif serv == 'pixeldrain':
+                        self.__engine = 'PixelDrain API'
+                        nlink = await PixelDrain(self, api_key).upload(file_path)
+                        if nlink:
+                            all_links['PixelDrain'] = nlink
+                    elif serv == 'buzzheavier':
+                        self.__engine = 'BuzzHeavier API'
+                        nlink = await BuzzHeavier(self, api_key).upload(file_path)
+                        if nlink:
+                            all_links['BuzzHeavier'] = nlink
+                    self.__processed_bytes = 0
+                except Exception as e:
+                    LOGGER.error(f"Error uploading to {serv}: {str(e)}")
+                    continue
+        
         if not all_links:
-            raise Exception("No DDL Enabled to Upload.")
+            raise Exception("No successful uploads completed.")
         return all_links
 
     async def upload(self, file_name, size):
@@ -108,6 +142,11 @@ class DDLUploader:
             if self.is_cancelled:
                 return
             LOGGER.info(f"Uploaded To DDL: {item_path}")
+            # Call onUploadComplete with the correct parameters
+            await self.__listener.onUploadComplete(link, size, self.total_files, 
+                                                 self.total_folders, mime_type, 
+                                                 file_name)
+            LOGGER.info(f"Task Done: {file_name}")
         except Exception as err:
             LOGGER.info("DDL Upload has been Cancelled")
             if self.__asyncSession:
@@ -117,9 +156,10 @@ class DDLUploader:
             await self.__listener.onUploadError(err)
             self.__is_errored = True
         finally:
+            # Remove finally block's onUploadComplete call
+            # as it's already called in try block
             if self.is_cancelled or self.__is_errored:
                 return
-            await self.__listener.onUploadComplete(link, size, self.total_files, self.total_folders, mime_type, file_name)
 
     @property
     def speed(self):
