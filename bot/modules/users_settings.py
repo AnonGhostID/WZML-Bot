@@ -23,6 +23,7 @@ from bot.helper.mirror_utils.upload_utils.gdriveTools import GoogleDriveHelper
 from bot.helper.ext_utils.db_handler import DbManger
 from bot.helper.ext_utils.bot_utils import getdailytasks, update_user_ldata, get_readable_file_size, sync_to_async, new_thread, is_gdrive_link
 from bot.helper.mirror_utils.upload_utils.ddlserver.gofile import Gofile
+from bot.helper.mirror_utils.upload_utils.ddlserver.pixeldrain import PixelDrain
 from bot.helper.themes import BotTheme
 
 handler_dict = {}
@@ -194,7 +195,7 @@ async def get_user_settings(from_user, key=None, edit_type=None, edit_mode=None)
         text = f"㊂ <b><u>{fname_dict[key]} Settings :</u></b>\n\n" \
                f"➲ <b>Enabled DDL Server(s) :</b> <i>{ddl_serv}</i>\n\n" \
                f"➲ <b>Description :</b> <i>{desp_dict[key][0]}</i>"
-        for btn in ['gofile', 'streamtape' , 'pixeldrain']:
+        for btn in ['gofile', 'pixeldrain']:
             buttons.ibutton(f"{'✅️' if btn in serv_list else ''} {fname_dict[btn]}", f"userset {user_id} {btn}")
         buttons.ibutton("Back", f"userset {user_id} back mirror", "footer")
         buttons.ibutton("Close", f"userset {user_id} close", "footer")
@@ -232,7 +233,7 @@ async def get_user_settings(from_user, key=None, edit_type=None, edit_mode=None)
         elif key in ['mprefix', 'mremname', 'msuffix']:
             set_exist = 'Not Exists' if (val:=user_dict.get(key, config_dict.get(f'MIRROR_FILENAME_{key[1:].upper()}', ''))) == '' else val
             text += f"➲ <b>Mirror Filename {fname_dict[key]} :</b> {set_exist}\n\n"
-        elif key in ['gofile', 'streamtape', 'pixeldrain']:
+        elif key in ['gofile', 'pixeldrain']:
             set_exist = 'Exists' if key in (ddl_dict:=user_dict.get('ddl_servers', {})) and ddl_dict[key][1] and ddl_dict[key][1] != '' else 'Not Exists'
             ddl_mode = 'Enabled' if key in (ddl_dict:=user_dict.get('ddl_servers', {})) and ddl_dict[key][0] else 'Disabled'
             text = f"➲ <b>Upload {fname_dict[key]} :</b> {ddl_mode}\n" \
@@ -313,7 +314,7 @@ async def set_custom(client, message, pre_event, key, direct=False):
     return_key = 'leech'
     n_key = key
     user_dict = user_data.get(user_id, {})
-    if key in ['gofile', 'streamtape', 'pixeldrain']:
+    if key in ['gofile', 'pixeldrain']:
         ddl_dict = user_dict.get('ddl_servers', {})
         mode, api = ddl_dict.get(key, [False, ""])
         if key == "gofile" and not await Gofile.is_goapi(value):
@@ -567,7 +568,7 @@ async def edit_user_settings(client, query):
         await update_user_settings(query, 'leech')
         if DATABASE_URL:
             await DbManger().update_user_data(user_id)
-    elif data[2] in ['sgofile', 'sstreamtape', 'spixeldrain', 'dgofile', 'dstreamtape', 'dpixeldrain']:
+    elif data[2] in ['sgofile', 'spixeldrain', 'dgofile', 'dpixeldrain']:
         handler_dict[user_id] = False
         ddl_dict = user_dict.get('ddl_servers', {})
         key = data[2][1:]  # This removes the 's' or 'd' prefix
@@ -604,7 +605,7 @@ async def edit_user_settings(client, query):
         else:
             await query.answer("Old Settings", show_alert=True)
             await update_user_settings(query)
-    elif data[2] in ['ddl_servers', 'user_tds', 'gofile', 'streamtape', 'pixeldrain']:
+    elif data[2] in ['ddl_servers', 'user_tds', 'gofile', 'pixeldrain']:
         handler_dict[user_id] = False
         await query.answer()
         edit_mode = len(data) == 4

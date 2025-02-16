@@ -5,6 +5,7 @@ from aiohttp import ClientSession
 import base64
 
 from bot import LOGGER
+from bot.helper.mirror_utils.upload_utils.progress_file_reader import ProgressFileReader
 
 class PixelDrain:
     def __init__(self, dluploader=None, api_key=None):
@@ -40,45 +41,44 @@ class PixelDrain:
         try:
             async with ClientSession() as session:
                 LOGGER.info("Starting file upload...")
-                async with session.put(upload_url, 
-                                     data=open(file_path, 'rb'),
-                                     headers=headers) as resp:
-                    LOGGER.info(f"Upload response status: {resp.status}")
-                    
-                    if resp.status >= 400:
-                        try:
-                            error = await resp.json()
-                            LOGGER.error(f"PixelDrain upload failed: {error}")
-                            raise Exception(f"Upload failed: {error.get('message', 'Unknown error')}")
-                        except:
-                            raise Exception(f"Upload failed with status {resp.status}")
-                    
-                    # Handle successful upload (status 201)
-                    if resp.status == 201:
-                        response_text = await resp.text()
-                        LOGGER.info(f"Got response: {response_text}")
+                with ProgressFileReader(filename=file_path, read_callback=self.dluploader.__progress_callback) as file:
+                    async with session.put(upload_url, data=file, headers=headers) as resp:
+                        LOGGER.info(f"Upload response status: {resp.status}")
                         
-                        # Try to extract ID from JSON if response is JSON
-                        try:
-                            import json
-                            json_response = json.loads(response_text)
-                            file_id = json_response.get('id')
-                            if file_id:
-                                download_url = f"https://pixeldrain.com/u/{file_id}"
-                                LOGGER.info(f"Generated download URL from JSON: {download_url}")
-                                return {"downloadPage": download_url}
-                        except json.JSONDecodeError:
-                            # If not JSON, treat as plain text
-                            file_id = response_text.strip().strip('"')
-                            if file_id:
-                                download_url = f"https://pixeldrain.com/u/{file_id}"
-                                LOGGER.info(f"Generated download URL from plain text: {download_url}")
-                                return {"downloadPage": download_url}
+                        if resp.status >= 400:
+                            try:
+                                error = await resp.json()
+                                LOGGER.error(f"PixelDrain upload failed: {error}")
+                                raise Exception(f"Upload failed: {error.get('message', 'Unknown error')}")
+                            except:
+                                raise Exception(f"Upload failed with status {resp.status}")
                         
-                        raise Exception("Could not extract file ID from response")
+                        # Handle successful upload (status 201)
+                        if resp.status == 201:
+                            response_text = await resp.text()
+                            LOGGER.info(f"Got response: {response_text}")
+                            
+                            # Try to extract ID from JSON if response is JSON
+                            try:
+                                import json
+                                json_response = json.loads(response_text)
+                                file_id = json_response.get('id')
+                                if file_id:
+                                    download_url = f"https://pixeldrain.com/u/{file_id}"
+                                    LOGGER.info(f"Generated download URL from JSON: {download_url}")
+                                    return {"downloadPage": download_url}
+                            except json.JSONDecodeError:
+                                # If not JSON, treat as plain text
+                                file_id = response_text.strip().strip('"')
+                                if file_id:
+                                    download_url = f"https://pixeldrain.com/u/{file_id}"
+                                    LOGGER.info(f"Generated download URL from plain text: {download_url}")
+                                    return {"downloadPage": download_url}
+                            
+                            raise Exception("Could not extract file ID from response")
 
-                    LOGGER.error(f"Upload failed - unexpected response status: {resp.status}")
-                    raise Exception("Upload failed - unexpected response status")
+                        LOGGER.error(f"Upload failed - unexpected response status: {resp.status}")
+                        raise Exception("Upload failed - unexpected response status")
 
         except Exception as e:
             LOGGER.error(f"Error uploading to PixelDrain: {str(e)}")

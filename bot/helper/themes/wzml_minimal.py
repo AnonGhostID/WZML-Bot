@@ -160,7 +160,7 @@ class WZMLStyle:
     CLOUD_LINK =      '☁️ Cloud Link'
     SAVE_MSG =        '📨 Save Message'
     RCLONE_LINK =     '♻️ RClone Link'
-    DDL_LINK =        '📎 {Serv} Link'
+    DDL_LINK =        '{Serv} Link'
     SOURCE_URL =      '🔐 Source Link'
     INDEX_LINK_F =    '🗂 Index Link'
     INDEX_LINK_D =    '⚡ Index Link'

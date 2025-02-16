@@ -15,20 +15,8 @@ from bot.helper.mirror_utils.upload_utils.ddlserver.gofile import Gofile
 from bot.helper.mirror_utils.upload_utils.ddlserver.streamtape import Streamtape
 from bot.helper.mirror_utils.upload_utils.ddlserver.pixeldrain import PixelDrain
 from bot.helper.ext_utils.fs_utils import get_mime_type
+from bot.helper.mirror_utils.upload_utils.progress_file_reader import ProgressFileReader
 
-
-class ProgressFileReader(BufferedReader):
-    def __init__(self, filename, read_callback=None):
-        super().__init__(open(filename, "rb"))
-        self.__read_callback = read_callback
-        self.length = Path(filename).stat().st_size
-        
-    def read(self, size=None):
-        size = size or (self.length - self.tell())
-        if self.__read_callback:
-            self.__read_callback(self.tell())
-        return super().read(size)
-        
 
 class DDLUploader:
     def __init__(self, listener=None, name=None, path=None):
@@ -52,6 +40,11 @@ class DDLUploader:
         self.__ddl_servers = user_dict.get('ddl_servers', {})
         
     def __progress_callback(self, current):
+        chunk_size = current - self.last_uploaded
+        self.last_uploaded = current
+        self.__processed_bytes += chunk_size
+
+    def _PixelDrain__progress_callback(self, current):
         chunk_size = current - self.last_uploaded
         self.last_uploaded = current
         self.__processed_bytes += chunk_size
