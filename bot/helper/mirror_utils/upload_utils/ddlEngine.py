@@ -85,6 +85,8 @@ class DDLUploader:
     async def __upload_to_ddl(self, file_path):
         """Modified to better handle upload responses"""
         all_links = {}
+        upload_errors = {}  # Track specific errors for each service
+        
         for serv, (enabled, api_key) in self.__ddl_servers.items():
             if enabled:
                 self.total_files = 0
@@ -114,10 +116,20 @@ class DDLUploader:
                     self.__processed_bytes = 0
                 except Exception as e:
                     LOGGER.error(f"Error uploading to {serv}: {str(e)}")
+                    upload_errors[serv] = str(e)
                     continue
         
         if not all_links:
-            raise Exception("No successful uploads completed.")
+            # Construct a more informative error message
+            error_msg = []
+            for serv, err in upload_errors.items():
+                error_msg.append(f"{serv}: {err}")
+            
+            if error_msg:
+                raise Exception(" | ".join(error_msg))
+            else:
+                raise Exception("No successful uploads completed.")
+                
         return all_links
 
     async def upload(self, file_name, size):

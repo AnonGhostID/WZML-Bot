@@ -131,8 +131,10 @@ def direct_link_generator(link):
         return osdn(link)
     elif 'github.com' in domain:
         return github(link)
-    elif any(x in domain for x in ['buzzheavier.com', 'fuckingfast.co']):
+    elif 'buzzheavier.com' in domain:
         return buzzheavier(link)
+    elif "fuckingfast.co" in domain:
+        return fuckingfast_dl(link)
     elif 'hxfile.co' in domain:
         return hxfile(link)
     elif '1drv.ms' in domain:
@@ -429,6 +431,32 @@ def buzzheavier(url):
         return f"{parsed_url.scheme}://{parsed_url.netloc}{d_url}"
     except Exception as e:
         raise DirectDownloadLinkException(f"ERROR: {e.__class__.__name__}") from e
+    finally:
+        session.close()
+
+def fuckingfast_dl(url):
+    """
+    Generate a direct download link for fuckingfast.co URLs.
+    @param url: URL from fuckingfast.co
+    @return: Direct download link
+    """
+    session = Session()
+    url = url.strip()
+    
+    try:
+        response = session.get(url)
+        content = response.text
+        pattern = r'window\.open\((["\'])(https://fuckingfast\.co/dl/[^"\']+)\1'
+        match = search(pattern, content)
+        
+        if not match:
+            raise DirectDownloadLinkException("ERROR: Could not find download link in page")
+            
+        direct_url = match.group(2)
+        return direct_url
+        
+    except Exception as e:
+        raise DirectDownloadLinkException(f"ERROR: {str(e)}") from e
     finally:
         session.close()
 

@@ -86,7 +86,7 @@ class PixelDrain:
             if result and result.get('downloadPage'):
                 return result['downloadPage']  # Return direct URL for DDLEngine
         else:
-            raise Exception("Folder upload not supported by PixelDrain")
+            raise Exception("Ga support upload Folder!")
         
         if self.dluploader.is_cancelled:
             return
