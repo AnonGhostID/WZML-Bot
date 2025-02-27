@@ -80,15 +80,28 @@ class PixelDrain:
     async def upload(self, file_path):
         """Main upload method"""
         LOGGER.info(f"PixelDrain upload called for: {file_path}")
-        if await aiopath.isfile(file_path):
+        
+        # Add exists check logging
+        exists = await aiopath.exists(file_path)
+        LOGGER.info(f"File exists check: {exists}")
+        
+        # Add isfile check logging
+        is_file = await aiopath.isfile(file_path)
+        LOGGER.info(f"Is file check: {is_file}")
+        
+        if is_file:
+            LOGGER.info("File verification passed, proceeding with upload...")
             result = await self.upload_file(file_path)
             LOGGER.info(f"Upload result: {result}")
             if result and result.get('downloadPage'):
                 return result['downloadPage']  # Return direct URL for DDLEngine
         else:
-            raise Exception("Ga support upload Folder!")
+            LOGGER.error(f"File verification failed - Path: {file_path}")
+            LOGGER.error(f"File exists: {exists}, Is file: {is_file}")
+            raise Exception("Cannot upload: Path is not a file!")
         
         if self.dluploader.is_cancelled:
+            LOGGER.info("Upload cancelled by user")
             return
             
         raise Exception("Failed to upload file to PixelDrain")

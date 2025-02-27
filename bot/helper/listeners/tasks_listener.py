@@ -509,6 +509,7 @@ class MirrorLeechListener:
                                 service_icons = {
                                     'GoFile': '📁',
                                     'PixelDrain': '📤',
+                                    'Buzzheavier': '📁',
                                     'StreamTape': '🎥'
                                 }
                                 service_icon = service_icons.get(dlup, '🔗')

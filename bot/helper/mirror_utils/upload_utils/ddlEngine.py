@@ -14,6 +14,7 @@ from bot import LOGGER, user_data
 from bot.helper.mirror_utils.upload_utils.ddlserver.gofile import Gofile
 from bot.helper.mirror_utils.upload_utils.ddlserver.streamtape import Streamtape
 from bot.helper.mirror_utils.upload_utils.ddlserver.pixeldrain import PixelDrain
+from bot.helper.mirror_utils.upload_utils.ddlserver.buzzheavier import BuzzHeavier
 from bot.helper.ext_utils.fs_utils import get_mime_type
 from bot.helper.mirror_utils.upload_utils.progress_file_reader import ProgressFileReader
 
