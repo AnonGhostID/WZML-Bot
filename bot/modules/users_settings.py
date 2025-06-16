@@ -25,6 +25,7 @@ from bot.helper.ext_utils.bot_utils import getdailytasks, update_user_ldata, get
 from bot.helper.mirror_utils.upload_utils.ddlserver.gofile import Gofile
 from bot.helper.mirror_utils.upload_utils.ddlserver.pixeldrain import PixelDrain
 from bot.helper.mirror_utils.upload_utils.ddlserver.buzzheavier import BuzzHeavier
+from bot.helper.mirror_utils.upload_utils.ddlserver.ranoz import Ranoz
 from bot.helper.themes import BotTheme
 
 handler_dict = {}
@@ -47,6 +48,7 @@ desp_dict = {'rcc': ['RClone is a command-line program to sync files and directo
             'streamtape': ['Streamtape is free Video Streaming & sharing Hoster', "Send StreamTape's Login and Key\n<b>Format:</b> <code>user_login:pass_key</code>\n<b>Timeout:</b> 60 sec"],
             'pixeldrain': ['PixelDrain is a file sharing service that makes sharing files easy', "Send PixelDrain's API Key. Get it on https://pixeldrain.com/api\n<b>Timeout:</b> 60 sec"],
             'buzzheavier': ['BuzzHeavier is a free file sharing and storage platform. You can store and share your content without any limit.', "Send BuzzHeavier's API Key. Get it on https://buzzheavier.com/myProfile, It will not be Accepted if the API Key is Invalid !!\n<b>Timeout:</b> 60 sec"],
+            'ranoz': ['Ranoz is a free file sharing and storage platform with secure upload capabilities.', "Send Ranoz's API Key. Get it from https://ranoz.gg/dashboard, It will not be Accepted if the API Key is Invalid !!\n<b>Timeout:</b> 60 sec"],
             }
 fname_dict = {'rcc': 'RClone',
              'lprefix': 'Prefix',
@@ -67,6 +69,7 @@ fname_dict = {'rcc': 'RClone',
              'streamtape': 'StreamTape',
              'pixeldrain': 'PixelDrain',
              'buzzheavier': 'BuzzHeavier',
+             'ranoz': 'Ranoz',
              }
 
 async def get_user_settings(from_user, key=None, edit_type=None, edit_mode=None):
@@ -196,7 +199,7 @@ async def get_user_settings(from_user, key=None, edit_type=None, edit_mode=None)
         text = f"㊂ <b><u>{fname_dict[key]} Settings :</u></b>\n\n" \
                f"➲ <b>Enabled DDL Server(s) :</b> <i>{ddl_serv}</i>\n\n" \
                f"➲ <b>Description :</b> <i>{desp_dict[key][0]}</i>"
-        for btn in ['gofile', 'pixeldrain', 'buzzheavier']:
+        for btn in ['gofile', 'pixeldrain', 'buzzheavier', 'ranoz']:
             buttons.ibutton(f"{'✅️' if btn in serv_list else ''} {fname_dict[btn]}", f"userset {user_id} {btn}")
         buttons.ibutton("Back", f"userset {user_id} back mirror", "footer")
         buttons.ibutton("Close", f"userset {user_id} close", "footer")
@@ -234,7 +237,7 @@ async def get_user_settings(from_user, key=None, edit_type=None, edit_mode=None)
         elif key in ['mprefix', 'mremname', 'msuffix']:
             set_exist = 'Not Exists' if (val:=user_dict.get(key, config_dict.get(f'MIRROR_FILENAME_{key[1:].upper()}', ''))) == '' else val
             text += f"➲ <b>Mirror Filename {fname_dict[key]} :</b> {set_exist}\n\n"
-        elif key in ['gofile', 'pixeldrain', 'buzzheavier']:
+        elif key in ['gofile', 'pixeldrain', 'buzzheavier', 'ranoz']:
             set_exist = 'Exists' if key in (ddl_dict:=user_dict.get('ddl_servers', {})) and ddl_dict[key][1] and ddl_dict[key][1] != '' else 'Not Exists'
             ddl_mode = 'Enabled' if key in (ddl_dict:=user_dict.get('ddl_servers', {})) and ddl_dict[key][0] else 'Disabled'
             text = f"➲ <b>Upload {fname_dict[key]} :</b> {ddl_mode}\n" \
@@ -315,10 +318,12 @@ async def set_custom(client, message, pre_event, key, direct=False):
     return_key = 'leech'
     n_key = key
     user_dict = user_data.get(user_id, {})
-    if key in ['gofile', 'pixeldrain', 'buzzheavier']:
+    if key in ['gofile', 'pixeldrain', 'buzzheavier', 'ranoz']:
         ddl_dict = user_dict.get('ddl_servers', {})
         mode, api = ddl_dict.get(key, [False, ""])
         if key == "gofile" and not await Gofile.is_goapi(value):
+            value = ""
+        elif key == "ranoz" and not await Ranoz.is_ranozapi(value):
             value = ""
         ddl_dict[key] = [mode, value]
         value = ddl_dict
@@ -569,15 +574,15 @@ async def edit_user_settings(client, query):
         await update_user_settings(query, 'leech')
         if DATABASE_URL:
             await DbManger().update_user_data(user_id)
-    elif data[2] in ['sgofile', 'spixeldrain', 'sbuzzheavier', 'dgofile', 'dpixeldrain', 'dbuzzheavier']:
+    elif data[2] in ['sgofile', 'spixeldrain', 'sbuzzheavier', 'sranoz', 'dgofile', 'dpixeldrain', 'dbuzzheavier', 'dranoz']:
         handler_dict[user_id] = False
         ddl_dict = user_dict.get('ddl_servers', {})
         key = data[2][1:]  # This removes the 's' or 'd' prefix
         mode, api = ddl_dict.get(key, [False, ""])
         if data[2][0] == 's':
             if not mode and api == '':
-                if key == 'pixeldrain':  # Add this check
-                    return await query.answer('PixelDrain API Key is required!', show_alert=True)
+                if key in ['pixeldrain', 'ranoz']:  # Add this check
+                    return await query.answer(f'{fname_dict[key]} API Key is required!', show_alert=True)
             ddl_dict[key] = [not mode, api]
         elif data[2][0] == 'd':
             ddl_dict[key] = [mode, '']
@@ -606,7 +611,7 @@ async def edit_user_settings(client, query):
         else:
             await query.answer("Old Settings", show_alert=True)
             await update_user_settings(query)
-    elif data[2] in ['ddl_servers', 'user_tds', 'gofile', 'pixeldrain', 'buzzheavier']:
+    elif data[2] in ['ddl_servers', 'user_tds', 'gofile', 'pixeldrain', 'buzzheavier', 'ranoz']:
         handler_dict[user_id] = False
         await query.answer()
         edit_mode = len(data) == 4

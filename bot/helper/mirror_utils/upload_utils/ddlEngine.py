@@ -15,6 +15,7 @@ from bot.helper.mirror_utils.upload_utils.ddlserver.gofile import Gofile
 from bot.helper.mirror_utils.upload_utils.ddlserver.streamtape import Streamtape
 from bot.helper.mirror_utils.upload_utils.ddlserver.pixeldrain import PixelDrain
 from bot.helper.mirror_utils.upload_utils.ddlserver.buzzheavier import BuzzHeavier
+from bot.helper.mirror_utils.upload_utils.ddlserver.ranoz import Ranoz
 from bot.helper.ext_utils.fs_utils import get_mime_type
 from bot.helper.mirror_utils.upload_utils.progress_file_reader import ProgressFileReader
 
@@ -117,6 +118,11 @@ class DDLUploader:
                         nlink = await BuzzHeavier(self, api_key).upload(file_path)
                         if nlink:
                             all_links['BuzzHeavier'] = nlink
+                    elif serv == 'ranoz':
+                        self.__engine = 'Ranoz API'
+                        nlink = await Ranoz(self, api_key).upload(file_path)
+                        if nlink:
+                            all_links['Ranoz'] = nlink
                     self.__processed_bytes = 0
                 except Exception as e:
                     LOGGER.error(f"Error uploading to {serv}: {str(e)}")
