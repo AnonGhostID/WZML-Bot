@@ -581,7 +581,7 @@ async def edit_user_settings(client, query):
         mode, api = ddl_dict.get(key, [False, ""])
         if data[2][0] == 's':
             if not mode and api == '':
-                if key in ['pixeldrain', 'ranoz']:  # Add this check
+                if key in ['pixeldrain']:  # Add this check
                     return await query.answer(f'{fname_dict[key]} API Key is required!', show_alert=True)
             ddl_dict[key] = [not mode, api]
         elif data[2][0] == 'd':
