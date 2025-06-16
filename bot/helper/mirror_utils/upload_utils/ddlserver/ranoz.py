@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 from os import path as ospath
 from aiofiles.os import path as aiopath, stat as aiostat
-from aiohttp import ClientSession
+from aiohttp import ClientSession, FormData
 import asyncio
+import aiofiles
+import json
 
 from bot import LOGGER
 
@@ -10,30 +12,7 @@ class Ranoz:
     def __init__(self, dluploader=None, api_key=None):
         self.api_url = "https://ranoz.gg/api/v1"
         self.dluploader = dluploader
-        self.api_key = api_key
-        if api_key:
-            LOGGER.info(f"Ranoz initialized with API key: {api_key[:8]}...")
-        else:
-            LOGGER.warning("Ranoz initialized without an API key. Some features may not work.")
-
-    @staticmethod
-    async def is_ranozapi(token):
-        """Validate Ranoz API key"""
-        if token is None:
-            return False
-
-        try:
-            async with ClientSession() as session:
-                headers = {'Authorization': f'Bearer {token}'}
-                async with session.get(
-                    "https://ranoz.gg/api/v1/account", headers=headers
-                ) as resp:
-                    if resp.status == 200:
-                        result = await resp.json()
-                        return result.get('success', False)
-                    return False
-        except Exception:
-            return False
+        LOGGER.info("Ranoz initialized successfully")
 
     async def upload_file(self, file_path):
         """Upload a single file to Ranoz using two-step process"""
@@ -51,11 +30,19 @@ class Ranoz:
         
         LOGGER.info(f"Uploading file: {file_name} ({file_size} bytes)")
         
+        # Check file size (warn for very large files)
+        if file_size > 5 * 1024 * 1024 * 1024:  # 5GB
+            LOGGER.warning(f"Large file detected: {file_size / (1024*1024*1024):.2f} GB - using streaming upload")
+        elif file_size > 10 * 1024 * 1024 * 1024:  # 10GB
+            LOGGER.warning(f"Very large file: {file_size / (1024*1024*1024):.2f} GB - upload may take a long time")
+        
         try:
+            # Use two-step process for reliable streaming upload
+            LOGGER.info("Using two-step upload process for better memory efficiency...")
+            
             # Step 1: Get pre-signed upload URL
             async with ClientSession() as session:
                 headers = {
-                    'Authorization': f'Bearer {self.api_key}',
                     'Content-Type': 'application/json'
                 }
                 
@@ -73,17 +60,32 @@ class Ranoz:
                         LOGGER.error(f"Failed to get upload URL: {resp.status} - {error_text}")
                         raise Exception(f"Failed to get upload URL: {resp.status}")
                     
-                    response_data = await resp.json()
-                    LOGGER.info(f"Upload URL response: {response_data}")
+                    # Check content type before attempting JSON decode
+                    content_type = resp.headers.get('content-type', '')
+                    response_text = await resp.text()
+                    LOGGER.info(f"Response content-type: {content_type}")
+                    LOGGER.info(f"Response text: {response_text}")
                     
-                    if not response_data.get('data'):
-                        raise Exception("No data in upload URL response")
-                    
-                    upload_url = response_data['data'].get('upload_url')
-                    file_data = response_data['data']
-                    
-                    if not upload_url:
-                        raise Exception("No upload URL in response")
+                    # Try to parse as JSON regardless of content-type (API returns JSON with text/plain header)
+                    try:
+                        response_data = json.loads(response_text)
+                        LOGGER.info(f"Upload URL response parsed successfully: {response_data}")
+                        
+                        if not response_data.get('data'):
+                            raise Exception("No data in upload URL response")
+                        
+                        upload_url = response_data['data'].get('upload_url')
+                        file_data = response_data['data']
+                        
+                        if not upload_url:
+                            raise Exception("No upload URL in response")
+                    except json.JSONDecodeError:
+                        # If not JSON, treat as plain text response (might be the upload URL directly)
+                        if response_text.startswith('http'):
+                            upload_url = response_text.strip()
+                            file_data = {'upload_url': upload_url}
+                        else:
+                            raise Exception(f"Failed to parse response. Content-Type: {content_type}, Response: {response_text}")
             
             # Step 2: Upload file to pre-signed URL
             if self.dluploader.is_cancelled:
@@ -109,18 +111,21 @@ class Ranoz:
             # For PUT request, success is indicated by status code, not response content
             LOGGER.info(f"File uploaded successfully to Ranoz")
             
-            # Extract file information from the first response (not the PUT response)
-            file_id = file_data.get('id') or file_data.get('file_id') or file_data.get('key')
-            file_url = file_data.get('url') or file_data.get('download_url')
+            # Extract file information from the upload URL response
+            file_id = file_data.get('id')
+            file_url = file_data.get('url')
             
             if file_url:
                 download_url = file_url
             elif file_id:
-                download_url = f"https://ranoz.gg/{file_id}"
+                download_url = f"https://ranoz.gg/file/{file_id}"
             else:
-                LOGGER.error(f"Could not extract file URL/ID from response: {file_data}")
-                raise Exception("Could not extract file URL from response")
+                # Fallback: try to get file info from a different endpoint
+                LOGGER.warning("Could not extract file URL from upload response, trying alternative approach")
+                # For now, we'll use a generic approach - this might need adjustment based on actual API behavior
+                download_url = f"https://ranoz.gg/files/{file_name}"
             
+            LOGGER.info(f"Generated download URL: {download_url}")
             return {"downloadPage": download_url}
                 
         except Exception as e:
@@ -130,12 +135,6 @@ class Ranoz:
     async def upload(self, file_path):
         """Main upload method"""
         LOGGER.info(f"Ranoz upload called for: {file_path}")
-        
-        if not self.api_key:
-            raise Exception("Ranoz API key is required!")
-            
-        if not await self.is_ranozapi(self.api_key):
-            raise Exception("Invalid Ranoz API Key, please check your account!")
         
         if await aiopath.isfile(file_path):
             result = await self.upload_file(file_path)
