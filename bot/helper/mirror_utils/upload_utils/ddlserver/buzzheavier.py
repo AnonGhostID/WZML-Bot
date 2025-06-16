@@ -2,6 +2,7 @@
 from os import path as ospath
 from aiofiles.os import path as aiopath
 from aiohttp import ClientSession
+import asyncio
 
 from bot import LOGGER
 
@@ -31,20 +32,23 @@ class BuzzHeavier:
         headers = {
             'Authorization': f'Bearer {self.api_key}',
             'Connection': 'keep-alive',
-            'keep-alive': '300'
+            'keep-alive': '300',
+            'Expect': '100-continue'
         }
         
         upload_url = f"{self.api_url}/{file_name}?locationId=12brteedoy0f"
         
         try:
             self.dluploader.last_uploaded = 0
-            result = await self.dluploader.upload_aiohttp(
-                upload_url,
-                file_path,
-                None,  # No req_file needed for PUT
-                {},     # No data needed for PUT
-                headers=headers,
-                method='PUT'
+            result = await asyncio.wait_for(
+                self.dluploader.upload_aiohttp(
+                    upload_url,
+                    file_path,
+                    None,  # No req_file needed for PUT
+                    {},     # No data needed for PUT
+                    headers=headers,
+                    method='PUT'
+                ), timeout=3600
             )
             
             if not result:
