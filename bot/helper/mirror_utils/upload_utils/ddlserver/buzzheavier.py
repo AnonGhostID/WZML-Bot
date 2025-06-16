@@ -40,15 +40,13 @@ class BuzzHeavier:
         
         try:
             self.dluploader.last_uploaded = 0
-            result = await asyncio.wait_for(
-                self.dluploader.upload_aiohttp(
-                    upload_url,
-                    file_path,
-                    None,  # No req_file needed for PUT
-                    {},     # No data needed for PUT
-                    headers=headers,
-                    method='PUT'
-                ), timeout=3600
+            result = await self.dluploader.upload_aiohttp(
+                upload_url,
+                file_path,
+                None,  # No req_file needed for PUT
+                {},     # No data needed for PUT
+                headers=headers,
+                method='PUT'
             )
             
             if not result:

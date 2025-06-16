@@ -7,7 +7,7 @@ from re import findall as re_findall
 from aiofiles.os import path as aiopath
 from time import time
 from tenacity import retry, wait_exponential, stop_after_attempt, retry_if_exception_type
-from aiohttp import ClientSession 
+from aiohttp import ClientSession, ClientTimeout
 from aiohttp.client_exceptions import ContentTypeError
 
 from bot import LOGGER, user_data
@@ -50,14 +50,17 @@ class DDLUploader:
         self.last_uploaded = current
         self.__processed_bytes += chunk_size
     
-    @retry(wait=wait_exponential(multiplier=2, min=4, max=8), stop=stop_after_attempt(3),
-        retry=retry_if_exception_type(Exception))
+    @retry(wait=wait_exponential(multiplier=2, min=10, max=60), stop=stop_after_attempt(2),
+        retry=retry_if_exception_type((Exception,)))
     async def upload_aiohttp(self, url, file_path, req_file, data, headers=None, method='POST'):
         """Modified to support both POST and PUT methods with proper file handling"""
+        # Create timeout that allows for large file uploads - 2 hours total timeout
+        timeout = ClientTimeout(total=7200, connect=60, sock_read=300)
+        
         with ProgressFileReader(filename=file_path, read_callback=self.__progress_callback) as file:
             if method.upper() == 'PUT':
-                # For PUT requests (like PixelDrain)
-                async with ClientSession() as session:
+                # For PUT requests (like BuzzHeavier)
+                async with ClientSession(timeout=timeout) as session:
                     async with session.put(url, data=file, headers=headers) as resp:
                         LOGGER.info(f"Upload response status: {resp.status}")
                         if resp.status in [200, 201]:
@@ -71,7 +74,7 @@ class DDLUploader:
             else:
                 # For POST requests (like GoFile)
                 data[req_file] = file
-                async with ClientSession() as session:
+                async with ClientSession(timeout=timeout) as session:
                     async with session.post(url, data=data, headers=headers) as resp:
                         LOGGER.info(f"Upload response status: {resp.status}")
                         if resp.status == 200:
