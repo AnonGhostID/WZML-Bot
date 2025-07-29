@@ -89,15 +89,19 @@ class PixelDrain:
         is_file = await aiopath.isfile(file_path)
         LOGGER.info(f"Is file check: {is_file}")
         
-        if is_file:
-            LOGGER.info("File verification passed, proceeding with upload...")
+        # Add isdir check for debugging
+        is_dir = await aiopath.isdir(file_path)
+        LOGGER.info(f"Is directory check: {is_dir}")
+        
+        if exists and not is_dir:
+            LOGGER.info("File verification passed (exists and not directory), proceeding with upload...")
             result = await self.upload_file(file_path)
             LOGGER.info(f"Upload result: {result}")
             if result and result.get('downloadPage'):
                 return result['downloadPage']  # Return direct URL for DDLEngine
         else:
             LOGGER.error(f"File verification failed - Path: {file_path}")
-            LOGGER.error(f"File exists: {exists}, Is file: {is_file}")
+            LOGGER.error(f"File exists: {exists}, Is file: {is_file}, Is directory: {is_dir}")
             raise Exception("Cannot upload: Path is not a file!")
         
         if self.dluploader.is_cancelled:

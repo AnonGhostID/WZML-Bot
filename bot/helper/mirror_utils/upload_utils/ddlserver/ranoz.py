@@ -136,7 +136,13 @@ class Ranoz:
         """Main upload method"""
         LOGGER.info(f"Ranoz upload called for: {file_path}")
         
-        if await aiopath.isfile(file_path):
+        # Add debugging for file detection
+        exists = await aiopath.exists(file_path)
+        is_file = await aiopath.isfile(file_path)
+        is_dir = await aiopath.isdir(file_path)
+        LOGGER.info(f"Ranoz file checks - Exists: {exists}, Is file: {is_file}, Is directory: {is_dir}")
+        
+        if exists and not is_dir:
             result = await self.upload_file(file_path)
             LOGGER.info(f"Upload result: {result}")
             if result and result.get('downloadPage'):
